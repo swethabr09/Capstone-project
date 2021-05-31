@@ -1,0 +1,142 @@
+{
+ "cells": [
+  {
+   "cell_type": "markdown",
+   "id": "558f3d52-9e4d-420c-992e-071197b1e8c8",
+   "metadata": {},
+   "source": [
+    "# CAR ACCIDENT SEVERITY"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "9c372a07-e5a7-4cf6-afe4-0e87162e5f79",
+   "metadata": {},
+   "source": [
+    "# Introduction\n",
+    "Road traffic accidents are estimated to cost the US economy ~$810bn per year in property damage, medical costs, legal bills and loss of earnings. Identifying the factors which influence accident severity is therefore of paramount importance.\n",
+    "It may seem intuitive and obvious that the occurrence and severity of road traffic accidents will be related to a number of factors including environmental conditions (weather, road surface conditions and lighting conditions), time of day/day of week, irresponsible driving (speeding, driving under the influence of alcohol/drugs, or simply not paying attention) and the angles and speeds at which vehicles collide. However, determining the manner in which these various factors interact to determine the severity of car accidents in a given state/city is not a trivial undertaking. While a number of these features may individually serve as good predictors of accident severity on their own, some of them seldom occur together: for instance, head-on collisions often involve serious injuries and fatalities, as do collisions on freeways (primarily due to the high speeds involved). However head-on collisions on freeways are relatively rare, due to the presence of barriers separating traffic travelling in different directions. How can we incorporate these features in to a cohesive understanding of road accident outcomes?\n",
+    "We can begin to unpick this complicated problem and gain insight into the factors which influence accident severity by studying data from past accidents, and then use Machine Learning techniques to create models to predict the severity of future/unfolding accidents based on the similarity of their initial conditions to those of other accidents in the historical record.\n",
+    "The two main beneficiaries of building this kind of model are (1) town/city planners, who may be able to use the model to inform their road planning and traffic calming strategies and (2) emergency service responders, who may be able to use the model to predict the severity of an accident based on information that’s provided at the time the accident is reported in order to optimally allocate resources across the city.\n",
+    "\n",
+    "\n",
+    "# Data\n",
+    "A comprehensive dataset of 226,000 accidents occurring between 2004–2019 in the Seattle city area was obtained from the Seattle Open Data Portal¹. The 226,000 row dataset has 40 columns describing the details of each accident including the weather conditions, collision type, date/time of accident and location (latitude and longitude).\n",
+    "A Choropleth map (created using the Python Folium package) reveals, perhaps unsurprisingly, that accidents occur more frequently towards the centre of the city, and in neighbourhoods at either end of road bridges which straddle Seattle’s major waterways. For instance, University District and Eastlake (separated by the Ship Canal Bridge) report a higher incidence of accidents than average, as do the Industrial District and Industrial District West (separated by the West Seattle Bridge)."
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "bc243cf7-5217-4b0c-b7b8-8ad64287b622",
+   "metadata": {},
+   "source": [
+    "A Choropleth map (created using the Python Folium package) reveals, perhaps unsurprisingly, that accidents occur more frequently towards the centre of the city, and in neighbourhoods at either end of road bridges which straddle Seattle’s major waterways. For instance, University District and Eastlake (separated by the Ship Canal Bridge) report a higher incidence of accidents than average, as do the Industrial District and Industrial District West (separated by the West Seattle Bridge)."
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "dbe9581a-bfb7-4a5c-837a-8e7d0ad76ff5",
+   "metadata": {},
+   "source": [
+    "One of the 40 columns in the dataset encodes the Seattle Department of Transport (SDOT) accident severity metric, according to the following schema:\n",
+    "\n",
+    "0: Unknown/no data\n",
+    "\n",
+    "1: Property damage only\n",
+    "\n",
+    "2: Minor injury collision\n",
+    "\n",
+    "2b: Major injury collision\n",
+    "\n",
+    "3: Fatality collision\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "c21e38ad-8208-46a7-8361-a5e1c69b353d",
+   "metadata": {},
+   "source": [
+    "# Data Preprocessing\n",
+    "\n",
+    "In their original form, the Seattle accident data are not suitable for quantitative data analysis. The main reasons for this are as follows:\n",
+    "\n",
+    "1. Data incompleteness: around 15% of the accidents in the dataset are missing one or more key features, including in some cases the target variable (accident severity code) and in others, are missing information about weather or road conditions. As the purpose of building the model is to see how these various features interact and influence the overall accident severity, data entries which are missing one or more of these key features are not useful, and were removed from the dataset.\n",
+    "\n",
+    "2. Dataset includes unnecessary/redundant columns: the accident dataset includes many columns of metadata (such as incident report numbers) and columns which duplicate information which is already included in other columns (such as a text field “SEVERITYDESC” which provides a written definition of the accompanying accident severity code, the target variable). Columns which include unnecessary/redundant information were removed from the dataset.\n",
+    "\n",
+    "3. Presence of categorical/non-numeric data: Machine Learning models require numerical data, and cannot handle alphanumeric strings. For example, each entry in the “WEATHER” column contains a text string which takes one of eleven values (e.g. “Clear”, “Rain”, “Snow”, etc) which describes the prevailing weather conditions at the time of the accident. Columns such as this were re-engineered to allow data analysis using the “One-Hot Encoding” technique², which replaces the input textual column with a series of binary columns (containing 1 or 0) relating to each possible value in the input column.\n",
+    "\n",
+    "4. Data are imbalanced and non-standardised: the target variable for this model is the accident severity code. Fortunately, the majority of accidents in Seattle (>97%) involve either no or minor injuries, and so the number of accidents with SEVERITYCODE=3 is very much less than the number of accidents with SEVERITYCODE=1. However this imbalance between the real-life occurrences of different accident outcomes may bias the model if not accounted for. To create the least-biased model, we re-sample the dataset by randomly-selecting a number of accidents (327) with severity codes 1, 2 and 2b which matches the total number of accidents in the dataset with severity code 3. Furthermore, the data are non-standardised: most of the data columns after data engineering have values of the order ~1, however a few columns (e.g. X, Y, giving the longitude and latitude of the accident, and YEAR) have numerical values which are orders of magnitude higher. To allow the model to identify the key features without being biased by the imbalance in data values, the data were standardised (i.e. every column re-scaled to have ~zero mean and ~unit variance) using the scikit learn StandardScaler routine."
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "a232ba67-d16c-440b-8fe8-815c152df4bc",
+   "metadata": {},
+   "source": [
+    "In randomly re-sampling accidents with damage-only, minor injuries or major injury outcomes to match the number of fatal accidents, the frequency distributions of the road/weather/light conditions in which accidents happened were not altered, nor were the ratio of accidents occurring on week days versus weekends, or on different months of the year altered significantly³. We can therefore be confident that the re-sampled data is not biased."
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "2462ed5a-91a7-4f66-a719-647307b23515",
+   "metadata": {},
+   "source": [
+    "# Model Development and Evaluation\n",
+    "\n",
+    "In order to develop a model for predicting accident severity, the re-sampled, cleaned dataset was split in to testing and training sub-samples (containing 30% and 70% of the samples, respectively) using the scikit learn “train_test_split” method. In total, four models were trained and evaluated.\n",
+    "\n",
+    "1. Logistic Regression Model: by converting the accident severity to a binary variable (0 for no/minor injuries, 1 for major injuries/fatalities) we can employ Logistic Regression techniques to attempt to classify accident outcomes based on the properties in the feature set. A Logistic Regression model was trained using an inverse-regularisation strength C=0.01, and tested on the testing subset. The Logistic Regression model correctly predicts SEVERITYCODE=1 accidents 70% of the time, correctly predicts SEVERITYCODE=0 accidents 84% of the time, and has F1 scores of 0.77 and 0.76 for the two outcomes.\n",
+    "\n",
+    "2. Decision Tree model: decision tree models identify the key features on which the data can be partitioned (and the thresholds at which to partition the data) in the hope of arriving, after some iterations, at “leaves” which contain only accidents belonging to one target variable value (in this case, accident severity code). A decision tree model was trained on the data according to the “entropy” criterion⁴, and allowed to run until covergence. The final decision tree is 30 branch-layers deep (from the data feature set of 60 features), the top four layers of which are shown below. The decision tree correctly predicts SEVERITYCODE=1 62% of the time, correctly predicts SEVERITYCODE=0 69% of the time and has F1 scores of 0.66 and 0.67 for the two accident classifications. According to the decision tree model, the top three features for determining the likelihood of an accident having severe consequences are (i) the number of vehicles involved, (ii) the number of pedestrians involved, and (iii) whether or not one or more drivers were speeding.\n",
+    "\n",
+    "3. Support Vector Machine (SVM) model: SVM models seek to separate data based on different values of the target variable by mapping the dataset to a higher-dimension space and identifying the support vectors which best-describe the hyper planes that most effectively partition the data. An SVM model was built using the scikit learn C-Support Vector Classification method (svm.svc), with a linear mapping kernel employed in order that the model could return a list of the features with the most diagnostic power for determining accident severity. The SVM model correctly predicts SEVERITYCODE=1 70% of the time, correctly predicts SEVERITYCODE=0 82% of the time, and has F1 scores of 0.76 and 0.75 for both accident outcomes. Like the decision tree model, SVM finds that two of the top three most crucial features are (i) the number of pedestrians involved, and (ii) whether or not a driver was speeding. SVM also identifies the accident type “head on collision; both vehicles moving” to be a major factor in accident severity.\n",
+    "\n",
+    "4. k-Nearest Neighbours (kNN) model: kNN models seek to categorise the outcome of an unknown data sample based on its proximity in the multi-dimensional hyperspace of the feature set to its “k” nearest neighbours, which have known outcomes. Establishing the value of “k” which optimises the model’s accuracy (between 1 and the total number of samples in the dataset) is an empirical undertaking: if too-few neighbouring datapoints are used, the model is susceptible to being dominated by noise, however if too many neighbours are included in the classification, the model risks losing all diagnostic power completely. kNN models were built for k=1–300 using the kNeighborsClassifier function from scikit learn. The model is optimised at k=25 (see below), at which the model correctly predicts accident severity code 1 and 0 62% and 87% of the time, respectively. The F1 scores of the two accident outcomes are 0.76 and 0.71."
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "377fc68b-2a77-45b6-93a2-5974ba685e3d",
+   "metadata": {},
+   "source": [
+    "# Conclusions and Future Work\n",
+    "\n",
+    "Car accident data for the city of Seattle between 2004–2019 have been used to train and evaluate machine learning models for predicting accident severity based on the circumstances of the accident. Four classes of models have been trained and evaluated: (i) Logistic Regression, (ii) Decision Tree, (iii) Support Vector Machine ant (iv) k-Nearest Neighbours. The Logistic Regression and SVM models perform best, having average F1 scores of 0.765 and 0.755, respectively. The kNN model has an average F1 score of 0.735. The Decision Tree model performs poorest, with an average F1 score of 0.665.\n",
+    "\n",
+    "One of the major advantages of the SVM model is its ability (if using a linear mapping kernel) to de-project the fitted support vectors back to the original parameter space in order to determine which features in the initial dataset offer the most diagnostic power. The SVM model highlights that accidents involving pedestrians, accidents involving excess speed and head-on collisions between moving vehicles have particularly severe outcomes. Despite the tiny fraction of accidents in the Seattle area which occurred on icy roads, the SVM model was still able to determine that when conditions are icy, the risk of severe accident outcomes is increased.\n",
+    "\n",
+    "This work highlights that machine learning techniques can be used to probe historical data in order to make reliable predictions about the outcome of road traffic accidents, given information which is available at the time when an accident is reported. This model can be extended to include new features or applied to accident databases in other cities/regions. By doing so, city planners can gain insight into the road conditions/features which are associated with high accident severity, and use this insight to improve road design. Additionally, by predicting accident severity as functions of weather, date, location and road conditions, this model may be able to help aid the decision making of emergency services call handlers, by allowing them to prioritise resources toward collisions with a greater likelihood of severe consequences."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "862a5226-91f3-4df2-a442-b8cfd1bfde07",
+   "metadata": {},
+   "outputs": [],
+   "source": []
+  }
+ ],
+ "metadata": {
+  "kernelspec": {
+   "display_name": "Python",
+   "language": "python",
+   "name": "conda-env-python-py"
+  },
+  "language_info": {
+   "codemirror_mode": {
+    "name": "ipython",
+    "version": 3
+   },
+   "file_extension": ".py",
+   "mimetype": "text/x-python",
+   "name": "python",
+   "nbconvert_exporter": "python",
+   "pygments_lexer": "ipython3",
+   "version": "3.6.13"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 5
+}
